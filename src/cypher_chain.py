@@ -1,21 +1,15 @@
 from typing import Any, Dict, List, Optional
-from langchain.chains.graph_qa.prompts import CYPHER_GENERATION_PROMPT
 from langchain.chains.graph_qa.cypher import extract_cypher
+from langchain.schema import SystemMessage
 
 
 
-import streamlit as st
 import spacy
 from langchain.chains import GraphCypherQAChain
 from langchain.callbacks.manager import CallbackManagerForChainRun
-from langchain.schema import BasePromptTemplate
-from langchain.schema.language_model import BaseLanguageModel
+
 
 from cypher_validator import CypherValidator
-
-
-nlp = spacy.load("en_core_web_md")
-validator = CypherValidator()
 
 def remove_entities(doc):
     """
@@ -69,6 +63,15 @@ AVAILABLE_RELATIONSHIPS = """
     (Article, MENTIONS, Organization)
 """
 
+CYPHER_SYSTEM_TEMPLATE = """
+Your task is to convert questions about contents in a Neo4j database to Cypher queries to query the Neo4j database.
+Use only the provided relationship types and properties.
+Do not use any other relationship types or properties that are not provided.
+"""
+
+nlp = spacy.load("en_core_web_md")
+validator = CypherValidator()
+
 class CustomCypherChain(GraphCypherQAChain):
     def find_entity_match(self, entity:str, k: int = 3):
         fts_query = """
@@ -78,6 +81,15 @@ class CustomCypherChain(GraphCypherQAChain):
         """
 
         return [el['result'] for el in self.graph.query(fts_query, {'entity': "AND ".join(entity.split()), 'k':k})]
+    
+    def generate_system_message(self, relevant_entities: str = "", fewshot_examples: str = ""):
+        system_message = CYPHER_SYSTEM_TEMPLATE
+        system_message += f"The database has the following schema: {self.graph.get_schema} "
+        if relevant_entities:
+            system_message += f"Relevant entities for the question are: {relevant_entities} "
+        if fewshot_examples:
+            system_message += f"Follow these Cypher examples when you are constructing a Cypher statement: {fewshot_examples} "
+        return SystemMessage(content=system_message)
 
     def _call(
         self,
@@ -101,22 +113,16 @@ class CustomCypherChain(GraphCypherQAChain):
         relevant_entities = dict()
         for entity in entities:
             relevant_entities[entity['text']] = self.find_entity_match(entity['text'])
-        print(f"Relevant etities are: {relevant_entities}")
+        print(f"Relevant entities are: {relevant_entities}")
 
         # Get few-shot examples using vector search
         cleaned_question = remove_entities(spacy_doc)
         fewshots = "vectorsearch"
 
-        generated_cypher = self.cypher_generation_chain.run(
-            {
-                "question": question,
-                "schema": self.graph.get_schema,
-                "few-shot": fewshots,
-                "relevant_entities": relevant_entities,
-            },
-            callbacks=callbacks,
-        )
-        generated_cypher = extract_cypher(generated_cypher)
+        system = self.generate_system_message(str(relevant_entities))
+        generated_cypher = self.cypher_generation_chain.llm.predict_messages([system] + chat_history)
+        print(generated_cypher.content)
+        generated_cypher = extract_cypher(generated_cypher.content)
         validated_cypher = validator.validate_query(AVAILABLE_RELATIONSHIPS, generated_cypher)
         print(validated_cypher)
         # Retrieve and limit the number of results

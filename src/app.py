@@ -4,7 +4,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.graphs import Neo4jGraph
 from langchain.schema import HumanMessage, AIMessage
 
-st.title("🦜🔗 Quickstart App")
+st.title("Knowledge Graph Chatbot")
 
 from cypher_chain import CustomCypherChain
 
