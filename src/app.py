@@ -52,6 +52,41 @@ def generate_context(
     context.append(HumanMessage(content=str(prompt)))
     return context
 
+def dynamic_response_tabs(i):
+    tabs_to_add = ["💬Chat"]
+    data_check = {
+        "🔍Cypher": st.session_state["cypher"][i],
+        "🗃️Database results": st.session_state["database"][i],
+        "🕸️Visualization": st.session_state["viz_data"][i] and st.session_state["viz_data"][i][0]
+    }
+
+    for tab_name, has_data in data_check.items():
+        if has_data:
+            tabs_to_add.append(tab_name)
+
+    with st.chat_message("user"):
+        st.write(st.session_state["user_input"][i])
+
+    with st.chat_message("assistant"):
+        selected_tabs = st.tabs(tabs_to_add)
+
+        with selected_tabs[0]:
+            st.write(st.session_state["generated"][i])
+        if len(selected_tabs) > 1:
+            with selected_tabs[1]:
+                st.code(st.session_state["cypher"][i], language="cypher")
+        if len(selected_tabs) > 2:
+            with selected_tabs[2]:
+                st.write(st.session_state["database"][i])
+        if len(selected_tabs) > 3:
+            with selected_tabs[3]:
+                graph_object = graphviz.Digraph()
+                for final_entity in st.session_state["viz_data"][i][1]:
+                    graph_object.node(final_entity, fillcolor="lightblue", style="filled")
+                for record in st.session_state["viz_data"][i][0]:
+                    graph_object.edge(record["source"], record["target"], label=record["type"])
+                st.graphviz_chart(graph_object)
+
 def get_text() -> str:
     input_text = st.chat_input("Who is the CEO of Neo4j?")
     if not openai_api_key.startswith('sk-'):
@@ -85,25 +120,4 @@ if st.session_state["generated"]:
     size = len(st.session_state["generated"])
     # Display only the last three exchanges
     for i in range(max(size - 3, 0), size):
-        with st.chat_message("user"):
-            st.write(st.session_state["user_input"][i])
-        with st.chat_message("assistant"):
-            chat, visualization, database, cypher = st.tabs(
-                ["Chat", "Visualization", "Database results", "Cypher"]
-            )
-            with chat:
-                st.write(st.session_state["generated"][i])
-            with visualization:
-                if st.session_state["viz_data"][i] and st.session_state["viz_data"][i][0]:
-                    graph_object = graphviz.Digraph()
-                    for final_entity in st.session_state["viz_data"][i][1]:
-                        graph_object.node(final_entity, fillcolor="lightblue", style="filled")
-                    for record in st.session_state["viz_data"][i][0]:
-                        graph_object.edge(
-                            record["source"], record["target"], label=record["type"]
-                        )
-                    st.graphviz_chart(graph_object)
-            with database:
-                st.write(st.session_state["database"][i])
-            with cypher:
-                st.code(st.session_state["cypher"][i], language="cypher")
+        dynamic_response_tabs(i)
