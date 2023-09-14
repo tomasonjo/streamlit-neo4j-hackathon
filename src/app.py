@@ -65,8 +65,8 @@ openai_api_key = st.sidebar.text_input('OpenAI API Key')
 os.environ["OPENAI_API_KEY"] = openai_api_key
 if openai_api_key:
     graph_search = CustomCypherChain.from_llm(
-    cypher_llm=ChatOpenAI(temperature=0.7, model_name="gpt-4"),
-    qa_llm=ChatOpenAI(temperature=0.7),
+    cypher_llm=ChatOpenAI(temperature=0.0, model_name="gpt-4"),
+    qa_llm=ChatOpenAI(temperature=0.0),
     graph=graph,
 )
 
