@@ -52,7 +52,6 @@ def generate_context(
     context.append(HumanMessage(content=str(prompt)))
     return context
 
-
 def get_text() -> str:
     input_text = st.chat_input("Who is the CEO of Neo4j?")
     if not openai_api_key.startswith('sk-'):
@@ -95,9 +94,11 @@ if st.session_state["generated"]:
             with chat:
                 st.write(st.session_state["generated"][i])
             with visualization:
-                if st.session_state["viz_data"][i]:
+                if st.session_state["viz_data"][i] and st.session_state["viz_data"][i][0]:
                     graph_object = graphviz.Digraph()
-                    for record in st.session_state["viz_data"][i]:
+                    for final_entity in st.session_state["viz_data"][i][1]:
+                        graph_object.node(final_entity, fillcolor="lightblue", style="filled")
+                    for record in st.session_state["viz_data"][i][0]:
                         graph_object.edge(
                             record["source"], record["target"], label=record["type"]
                         )

@@ -165,6 +165,17 @@ class CustomCypherChain(GraphCypherQAChain):
             AVAILABLE_RELATIONSHIPS, generated_cypher
         )
         print(validated_cypher)
+        # If Cypher statement wasn't generated
+        # Usually happens when LLM decides it can't answer
+        if not "MATCH" in validated_cypher[0]:
+            chain_result: Dict[str, Any] = {
+            self.output_key: validated_cypher[0],
+            "viz_data": (None, None),
+            "database": None,
+            "cypher": None,
+        }
+            return chain_result
+
         # Retrieve and limit the number of results
         context = self.graph.query(validated_cypher[0])[: self.top_k]
 
@@ -181,7 +192,7 @@ class CustomCypherChain(GraphCypherQAChain):
 
         chain_result: Dict[str, Any] = {
             self.output_key: final_result,
-            "viz_data": viz_data,
+            "viz_data": (viz_data, final_entities),
             "database": context,
             "cypher": validated_cypher[0],
         }
