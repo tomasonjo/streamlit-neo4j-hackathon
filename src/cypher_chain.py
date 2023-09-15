@@ -9,8 +9,10 @@ from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.chains import GraphCypherQAChain
 from langchain.callbacks.manager import CallbackManagerForChainRun
 
-from pydantic import v1 as pydantic_v1
-
+try:
+    from pydantic.v1.main import BaseModel, Field
+except ImportError:
+    from pydantic.main import BaseModel, Field
 
 from cypher_validator import CypherValidator
 
@@ -92,10 +94,10 @@ CYPHER_QA_PROMPT = PromptTemplate(
 )
 
 
-class Entities(pydantic_v1.BaseModel):
+class Entities(BaseModel):
     """Identifying information about entities."""
 
-    name: List[str] = pydantic_v1.Field(
+    name: List[str] = Field(
         ...,
         description="All the person, organization, or business entities that appear in the text",
     )
