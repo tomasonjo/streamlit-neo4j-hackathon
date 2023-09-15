@@ -1,3 +1,5 @@
+import os
+
 from typing import Any, Dict, List, Optional, Tuple
 from langchain.chains.graph_qa.cypher import extract_cypher
 from langchain.schema import SystemMessage
@@ -132,6 +134,20 @@ class CustomCypherChain(GraphCypherQAChain):
             system_message += f"Follow these Cypher examples when you are constructing a Cypher statement: {fewshot_examples} "
         return SystemMessage(content=system_message)
 
+    def get_fewshot_examples(self, question):
+        results = self.graph.query(
+            """
+        CALL apoc.ml.openai.embedding([$question], $openai_api_key)
+                                    YIELD embedding                             
+        CALL db.index.vector.queryNodes('fewshot', 3, embedding)
+                                    YIELD node, score
+        RETURN node.Question AS question, node.Cypher as cypher
+                                    """,
+            {"question": question, "openai_api_key": os.environ["OPENAI_API_KEY"]},
+        )
+
+        return "\n".join([f"#{el['question']}\n{el['cypher']}" for el in results])
+
     def _call(
         self,
         inputs: Dict[str, Any],
@@ -152,10 +168,9 @@ class CustomCypherChain(GraphCypherQAChain):
         print(f"Relevant entities are: {relevant_entities}")
 
         # Get few-shot examples using vector search
+        fewshots = self.get_fewshot_examples(question)
 
-        fewshots = "vectorsearch"
-
-        system = self.generate_system_message(str(relevant_entities))
+        system = self.generate_system_message(str(relevant_entities), fewshots)
         generated_cypher = self.cypher_generation_chain.llm.predict_messages(
             [system] + chat_history
         )
@@ -167,17 +182,19 @@ class CustomCypherChain(GraphCypherQAChain):
         print(validated_cypher)
         # If Cypher statement wasn't generated
         # Usually happens when LLM decides it can't answer
-        if not "MATCH" in validated_cypher[0]:
+        if not "RETURN" in validated_cypher[0]:
             chain_result: Dict[str, Any] = {
-            self.output_key: validated_cypher[0],
-            "viz_data": (None, None),
-            "database": None,
-            "cypher": None,
-        }
+                self.output_key: validated_cypher[0],
+                "viz_data": (None, None),
+                "database": None,
+                "cypher": None,
+            }
             return chain_result
 
         # Retrieve and limit the number of results
-        context = self.graph.query(validated_cypher[0])[: self.top_k]
+        context = self.graph.query(
+            validated_cypher[0], {"openai_api_key": os.environ["OPENAI_API_KEY"]}
+        )[: self.top_k]
 
         result = self.qa_chain(
             {"question": question, "context": context}, callbacks=callbacks

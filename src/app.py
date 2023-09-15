@@ -52,12 +52,14 @@ def generate_context(
     context.append(HumanMessage(content=str(prompt)))
     return context
 
+
 def dynamic_response_tabs(i):
     tabs_to_add = ["💬Chat"]
     data_check = {
         "🔍Cypher": st.session_state["cypher"][i],
         "🗃️Database results": st.session_state["database"][i],
-        "🕸️Visualization": st.session_state["viz_data"][i] and st.session_state["viz_data"][i][0]
+        "🕸️Visualization": st.session_state["viz_data"][i]
+        and st.session_state["viz_data"][i][0],
     }
 
     for tab_name, has_data in data_check.items():
@@ -82,27 +84,32 @@ def dynamic_response_tabs(i):
             with selected_tabs[3]:
                 graph_object = graphviz.Digraph()
                 for final_entity in st.session_state["viz_data"][i][1]:
-                    graph_object.node(final_entity, fillcolor="lightblue", style="filled")
+                    graph_object.node(
+                        final_entity, fillcolor="lightblue", style="filled"
+                    )
                 for record in st.session_state["viz_data"][i][0]:
-                    graph_object.edge(record["source"], record["target"], label=record["type"])
+                    graph_object.edge(
+                        record["source"], record["target"], label=record["type"]
+                    )
                 st.graphviz_chart(graph_object)
+
 
 def get_text() -> str:
     input_text = st.chat_input("Who is the CEO of Neo4j?")
-    if not openai_api_key.startswith('sk-'):
-        st.warning('Please enter your OpenAI API key!', icon='⚠')
+    if not openai_api_key.startswith("sk-"):
+        st.warning("Please enter your OpenAI API key!", icon="⚠")
     else:
         return input_text
-    
 
-openai_api_key = st.sidebar.text_input('OpenAI API Key')
+
+openai_api_key = st.sidebar.text_input("OpenAI API Key")
 os.environ["OPENAI_API_KEY"] = openai_api_key
 if openai_api_key:
     graph_search = CustomCypherChain.from_llm(
-    cypher_llm=ChatOpenAI(temperature=0.0, model_name="gpt-4"),
-    qa_llm=ChatOpenAI(temperature=0.0),
-    graph=graph,
-)
+        cypher_llm=ChatOpenAI(temperature=0.0, model_name="gpt-4"),
+        qa_llm=ChatOpenAI(temperature=0.0),
+        graph=graph,
+    )
 
 user_input = get_text()
 
