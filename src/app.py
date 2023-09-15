@@ -7,6 +7,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain.graphs import Neo4jGraph
 from langchain.schema import HumanMessage, AIMessage
 
+from cypher_chain import CYPHER_QA_PROMPT
+
 st.title("VC Chatbot")
 
 from cypher_chain import CustomCypherChain
@@ -109,6 +111,7 @@ if openai_api_key:
         cypher_llm=ChatOpenAI(temperature=0.0, model_name="gpt-4"),
         qa_llm=ChatOpenAI(temperature=0.0),
         graph=graph,
+        qa_prompt=CYPHER_QA_PROMPT,
     )
 st.sidebar.markdown(
     """

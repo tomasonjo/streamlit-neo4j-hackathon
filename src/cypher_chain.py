@@ -2,12 +2,14 @@ import os
 
 from typing import Any, Dict, List, Optional, Tuple
 from langchain.chains.graph_qa.cypher import extract_cypher
+from langchain.chains.openai_functions import create_structured_output_chain
 from langchain.schema import SystemMessage
+from langchain.prompts import ChatPromptTemplate, PromptTemplate
 
-
-import spacy
 from langchain.chains import GraphCypherQAChain
 from langchain.callbacks.manager import CallbackManagerForChainRun
+
+from pydantic import BaseModel, Field
 
 
 from cypher_validator import CypherValidator
@@ -48,14 +50,6 @@ def remove_entities(doc):
     return new_text
 
 
-def process_entities(text: str) -> Tuple[List[str], str]:
-    spacy_doc = nlp(text)
-    entities = [ent.text for ent in spacy_doc.ents if ent.label_ in ["PERSON", "ORG"]]
-    cleaned_question = remove_entities(spacy_doc)
-
-    return entities, cleaned_question
-
-
 AVAILABLE_RELATIONSHIPS = """
     (Person, HAS_PARENT, Person),
     (Person, HAS_CHILD, Person),
@@ -79,11 +73,56 @@ Use only the provided relationship types and properties.
 Do not use any other relationship types or properties that are not provided.
 """
 
-nlp = spacy.load("en_core_web_md")
 validator = CypherValidator()
+
+CYPHER_QA_TEMPLATE = """You are an assistant that helps to form nice and human understandable answers.
+The information part contains the provided information that you must use to construct an answer.
+The provided information is authoritative, you must never doubt it or try to use your internal knowledge to correct it.
+Make the answer sound as a response to the question. Do not mention that you based the result on the given information.
+If the provided information is empty, say that you don't know the answer.
+Even if the question doesn't provide full person or organization names, you should use the full names from the provided
+information to construct an answer.
+Information:
+{context}
+
+Question: {question}
+Helpful Answer:"""
+CYPHER_QA_PROMPT = PromptTemplate(
+    input_variables=["context", "question"], template=CYPHER_QA_TEMPLATE
+)
+
+
+class Entities(BaseModel):
+    """Identifying information about entities."""
+
+    name: List[str] = Field(
+        ...,
+        description="All the person, organization, or business entities that appear in the text",
+    )
 
 
 class CustomCypherChain(GraphCypherQAChain):
+    def process_entities(self, text: str) -> List[str]:
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are extracting organization and person entities from the text.",
+                ),
+                (
+                    "human",
+                    "Use the given format to extract information from the following input: {input}",
+                ),
+            ]
+        )
+
+        entity_chain = create_structured_output_chain(
+            Entities, self.qa_chain.llm, prompt
+        )
+        entities = entity_chain.run(text)
+        print(entities)
+        return entities.name
+
     def get_viz_data(self, entities: List[str]) -> List[Tuple[str, str]]:
         viz_query = """
         MATCH (n:Person|Organization) WHERE n.name IN $entities
@@ -129,9 +168,20 @@ class CustomCypherChain(GraphCypherQAChain):
         if relevant_entities:
             system_message += (
                 f"Relevant entities for the question are: {relevant_entities} "
+                "Always replace the entity in the input question with relevant entites from the list\n"
+                "For example, if the relevant entities mention a person: John : ['John Goodman', 'John Stockton'] "
+                "You should always use a query like MATCH (p:Person) WHERE p.name IN ['John Goodman', 'John Stockton']"
+                "To catch all the available options "
             )
         if fewshot_examples:
             system_message += f"Follow these Cypher examples when you are constructing a Cypher statement: {fewshot_examples} "
+
+        system_message += (
+            "Always provide enough information in the response so that an outsider"
+            "without any additional context can answer the question. For example, "
+            "if the question mentions a person and an organization, you should try to "
+            "return both information about the person as well as the organization!"
+        )
         return SystemMessage(content=system_message)
 
     def get_fewshot_examples(self, question):
@@ -160,8 +210,8 @@ class CustomCypherChain(GraphCypherQAChain):
         chat_history = inputs["chat_history"]
         intermediate_steps: List = []
         # Extract mentioned people and organizations and match them to database values
-        entities, clean_question = process_entities(question)
-        print(f"SpaCy found: {entities}")
+        entities = self.process_entities(question)
+        print(f"NER found: {entities}")
         relevant_entities = dict()
         for entity in entities:
             relevant_entities[entity] = self.find_entity_match(entity)
@@ -201,7 +251,7 @@ class CustomCypherChain(GraphCypherQAChain):
         )
         final_result = result[self.qa_chain.output_key]
 
-        final_entities, _ = process_entities(final_result)
+        final_entities = self.process_entities(final_result)
         if final_entities:
             viz_data = self.get_viz_data(final_entities)
         else:

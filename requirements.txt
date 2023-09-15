@@ -1,8 +1,6 @@
 streamlit==1.26.0
 openai
 langchain==0.0.287
-spacy==3.6.1
 neo4j==5.12.0
 graphviz==0.20.1
-en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.6.0/en_core_web_md-3.6.0-py3-none-any.whl
 
