@@ -104,7 +104,7 @@ def get_text() -> str:
         return input_text
 
 
-openai_api_key = st.sidebar.text_input("OpenAI API Key")
+openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password")
 os.environ["OPENAI_API_KEY"] = openai_api_key
 if openai_api_key:
     graph_search = CustomCypherChain.from_llm(
