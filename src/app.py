@@ -110,6 +110,23 @@ if openai_api_key:
         qa_llm=ChatOpenAI(temperature=0.0),
         graph=graph,
     )
+st.sidebar.markdown(
+    """
+## Example questions
+
+* What do you know about Neo4j organization?
+* Who is Neo4j CEO?
+* How is Emil Eifrem connected to Magnus Christerson?
+* Which company has the most subsidiaries?
+* What are the latest news around companies where Emil Eifrem is CEO?
+* Are there any news about new partnerships mentioning Neo4j?
+* Are there any partnerships mentioned in news for companies where Daniel Rumennik is an investor? 
+
+You can also ask follow up questions as we use a conversational LLM under the hood.
+
+Code is available on [GitHub](https://github.com/tomasonjo/streamlit-neo4j-hackathon)
+"""
+)
 
 user_input = get_text()
 
