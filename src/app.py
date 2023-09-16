@@ -121,9 +121,9 @@ st.sidebar.markdown(
 * Who is Neo4j CEO?
 * How is Emil Eifrem connected to Magnus Christerson?
 * Which company has the most subsidiaries?
+* Who are the competitors of databricks?
 * What are the latest news around companies where Emil Eifrem is CEO?
 * Are there any news about new partnerships mentioning Neo4j?
-* Are there any partnerships mentioned in news for companies where Daniel Rumennik is an investor? 
 
 You can also ask follow up questions as we use a conversational LLM under the hood.
 
@@ -134,14 +134,15 @@ Code is available on [GitHub](https://github.com/tomasonjo/streamlit-neo4j-hacka
 user_input = get_text()
 
 if user_input:
-    context = generate_context(user_input)
-    output = graph_search({"query": user_input, "chat_history": context})
+    with st.spinner("Processing"):
+        context = generate_context(user_input)
+        output = graph_search({"query": user_input, "chat_history": context})
 
-    st.session_state.user_input.append(user_input)
-    st.session_state.generated.append(output["result"])
-    st.session_state.viz_data.append(output["viz_data"])
-    st.session_state.database.append(output["database"])
-    st.session_state.cypher.append(output["cypher"])
+        st.session_state.user_input.append(user_input)
+        st.session_state.generated.append(output["result"])
+        st.session_state.viz_data.append(output["viz_data"])
+        st.session_state.database.append(output["database"])
+        st.session_state.cypher.append(output["cypher"])
 
 if st.session_state["generated"]:
     size = len(st.session_state["generated"])

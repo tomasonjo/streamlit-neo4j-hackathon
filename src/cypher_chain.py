@@ -172,8 +172,12 @@ class CustomCypherChain(GraphCypherQAChain):
                 f"Relevant entities for the question are: {relevant_entities} "
                 "Always replace the entity in the input question with relevant entites from the list\n"
                 "For example, if the relevant entities mention a person: John : ['John Goodman', 'John Stockton'] "
-                "You should always use a query like MATCH (p:Person) WHERE p.name IN ['John Goodman', 'John Stockton']"
-                "To catch all the available options "
+                "You should always use a query like MATCH (p:Person WHERE p.name IN ['John Goodman', 'John Stockton'])"
+                "To catch all the available options. If you have a query like: "
+                "MATCH (p:Person {name:'John'})<-[:BOARD_MEMBER]-(o:Organization) You need to split it into two MATCHES"
+                "MATCH (p:Person) WHERE p.name IN ['John Goodman', 'John Stockton'] "
+                "MATCH (p)<-[:BOARD_MEMBER]-(o:Organization) "
+
             )
         if fewshot_examples:
             system_message += f"Follow these Cypher examples when you are constructing a Cypher statement: {fewshot_examples} "
