@@ -186,6 +186,10 @@ class CustomCypherChain(GraphCypherQAChain):
             "without any additional context can answer the question. For example, "
             "if the question mentions a person and an organization, you should try to "
             "return both information about the person as well as the organization!"
+            "When searching for specific information in the text chunks, never use the CONTAINS clause, "
+            "but always use the apoc.ml.openai.embedding and gds.similarity.cosine functions "
+            "or db.index.vector.queryNodes as shown in the examples. "
+            "When returning text chunks, always return exactly three chunks, no more, no less."
         )
         return SystemMessage(content=system_message)
 
