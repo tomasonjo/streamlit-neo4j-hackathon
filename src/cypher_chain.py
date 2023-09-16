@@ -169,14 +169,20 @@ class CustomCypherChain(GraphCypherQAChain):
         )
         if relevant_entities:
             system_message += (
-                f"Relevant entities for the question are: {relevant_entities} "
-                "Always replace the entity in the input question with relevant entites from the list\n"
-                "For example, if the relevant entities mention a person: John : ['John Goodman', 'John Stockton'] "
-                "You should always use a query that catch all the available options. If you want to have a query like: "
-                "Template: 'MATCH (p:Person {name:'John'})<-[:BOARD_MEMBER]-(o:Organization)' You need to split it into two MATCHES"
-                "Corrected query: 'MATCH (p:Person) WHERE p.name IN ['John Goodman', 'John Stockton'] "
-                "MATCH (p)<-[:BOARD_MEMBER]-(o:Organization)' "
+                f"Instructions for Generating Cypher Query with Relevant Entities \n"
+                f"Replace any specific entity in the query with the corresponding entries from the {relevant_entities} list."
+                "Example: If the list of relevant entities includes a person named John, "
+                "represented as John: ['John Goodman'], make sure to replace 'John' in the template query with the entities from the list."
+                "Catching All Available Options: When constructing your Cypher query, "
+                "ensure that it's flexible enough to include all listed relevant entities."
 
+                "Incorrect Template: 'MATCH (p:Person {name:'John'})<-[:BOARD_MEMBER]-(o:Organization)' "
+                "Corrected Query: Split this into two matches and use a WHERE clause to make it more flexible."
+                "MATCH (p:Person) "
+                " WHERE p.name IN ['John Goodman', 'John Stockton'] "
+                " MATCH (p)<-[:BOARD_MEMBER]-(o:Organization) "
+                " By adhering to these guidelines, you should be able to construct Cypher queries that accurately "
+                "reflect the relevant entities and relationships. "
             )
         if fewshot_examples:
             system_message += f"Follow these Cypher examples when you are constructing a Cypher statement: {fewshot_examples} "
@@ -189,6 +195,7 @@ class CustomCypherChain(GraphCypherQAChain):
             "When searching for specific information in the text chunks, never use the CONTAINS clause, "
             "but always use the apoc.ml.openai.embedding and gds.similarity.cosine functions "
             "or db.index.vector.queryNodes as shown in the examples. "
+            "Note: If yo uuse apoc.ml.openai.embedding, it should always be the first thing in a query. "
             "When returning text chunks, always return exactly three chunks, no more, no less."
         )
         return SystemMessage(content=system_message)
@@ -209,6 +216,7 @@ class CustomCypherChain(GraphCypherQAChain):
         print("-" * 30)
         print(fewshot)
         return fewshot
+
     def _call(
         self,
         inputs: Dict[str, Any],

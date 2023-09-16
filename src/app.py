@@ -16,9 +16,10 @@ from cypher_chain import CustomCypherChain
 url = st.secrets["NEO4J_URL"]
 username = st.secrets["NEO4J_USERNAME"]
 password = st.secrets["NEO4J_PASSWORD"]
+database = st.secrets["NEO4J_DATABASE"]
 
 # Langchain x Neo4j connections
-graph = Neo4jGraph(username=username, password=password, url=url)
+graph = Neo4jGraph(username=username, password=password, url=url, database=database)
 
 graph_search = None
 
