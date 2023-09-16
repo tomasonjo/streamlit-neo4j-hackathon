@@ -205,8 +205,10 @@ class CustomCypherChain(GraphCypherQAChain):
             {"question": question, "openai_api_key": os.environ["OPENAI_API_KEY"]},
         )
 
-        return "\n".join([f"#{el['question']}\n{el['cypher']}" for el in results])
-
+        fewshot = "\n".join([f"#{el['question']}\n{el['cypher']}" for el in results])
+        print("-" * 30)
+        print(fewshot)
+        return fewshot
     def _call(
         self,
         inputs: Dict[str, Any],
