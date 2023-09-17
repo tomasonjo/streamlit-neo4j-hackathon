@@ -123,6 +123,7 @@ st.sidebar.markdown(
 * How is Emil Eifrem connected to Magnus Christerson?
 * Which company has the most subsidiaries?
 * Who are the competitors of databricks?
+* Are there any news regarding employee satisfaction?
 * What are the latest news around companies where Emil Eifrem is CEO?
 * Are there any news about new partnerships mentioning Neo4j?
 

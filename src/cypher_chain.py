@@ -70,9 +70,8 @@ AVAILABLE_RELATIONSHIPS = """
 """
 
 CYPHER_SYSTEM_TEMPLATE = """
-Your task is to convert questions about contents in a Neo4j database to Cypher queries to query the Neo4j database.
-Use only the provided relationship types and properties.
-Do not use any other relationship types or properties that are not provided.
+Purpose:
+Your role is to convert user questions concerning data in a Neo4j database into accurate Cypher queries.
 """
 
 validator = CypherValidator()
@@ -165,38 +164,32 @@ class CustomCypherChain(GraphCypherQAChain):
     ) -> SystemMessage:
         system_message = CYPHER_SYSTEM_TEMPLATE
         system_message += (
-            f"The database has the following schema: {self.graph.get_schema} "
+            f"Database Schema: Please refer to the provided database schema {self.graph.get_schema} for reference. "
+            "Guidelines: Relationships & Properties: Utilize only the relationship types "
+            "and properties specified in the provided schema. Do not introduce new ones.\n"
         )
         if relevant_entities:
             system_message += (
-                f"Instructions for Generating Cypher Query with Relevant Entities \n"
-                f"Replace any specific entity in the query with the corresponding entries from the {relevant_entities} list."
-                "Example: If the list of relevant entities includes a person named John, "
-                "represented as John: ['John Goodman'], make sure to replace 'John' in the template query with the entities from the list."
-                "Catching All Available Options: When constructing your Cypher query, "
-                "ensure that it's flexible enough to include all listed relevant entities."
-
-                "Incorrect Template: 'MATCH (p:Person {name:'John'})<-[:BOARD_MEMBER]-(o:Organization)' "
-                "Corrected Query: Split this into two matches and use a WHERE clause to make it more flexible."
-                "MATCH (p:Person) "
-                " WHERE p.name IN ['John Goodman', 'John Stockton'] "
-                " MATCH (p)<-[:BOARD_MEMBER]-(o:Organization) "
-                " By adhering to these guidelines, you should be able to construct Cypher queries that accurately "
-                "reflect the relevant entities and relationships. "
+                f"Entity Substitution: If the question mentions specific entities, replace them in the query with corresponding entities from "
+                f"the given list. Given list of entities is: {relevant_entities}\n"
+                "Example: If the list contains John: ['John Goodman'], replace 'John' in the query with 'John Goodman'."
+                "Flexible Queries: Ensure your Cypher queries can capture all relevant entities.\n"
+                "Correct: MATCH (p:Person) WHERE p.name IN ['John Goodman', 'John Stockton'] MATCH (p)<-[:BOARD_MEMBER]-(o:Organization)"
             )
         if fewshot_examples:
-            system_message += f"Follow these Cypher examples when you are constructing a Cypher statement: {fewshot_examples} "
+            system_message += (
+                f"Example Queries: Please refer to the provided example queries for constructing Cypher statements:\n"
+                f"{fewshot_examples}\n"
+            )
 
         system_message += (
-            "Always provide enough information in the response so that an outsider"
-            "without any additional context can answer the question. For example, "
-            "if the question mentions a person and an organization, you should try to "
-            "return both information about the person as well as the organization!"
-            "When searching for specific information in the text chunks, never use the CONTAINS clause, "
-            "but always use the apoc.ml.openai.embedding and gds.similarity.cosine functions "
-            "or db.index.vector.queryNodes as shown in the examples. "
-            "Note: If yo uuse apoc.ml.openai.embedding, it should always be the first thing in a query. "
-            "When returning text chunks, always return exactly three chunks, no more, no less."
+            "Informative Responses: Ensure your responses contain sufficient information to answer the question for anyone lacking context.\n"
+            "Include details about both persons and organizations, if applicable. \n"
+            "Text Search: To search text, avoid using the CONTAINS clause. "
+            "Instead, employ apoc.ml.openai.embedding and gds.similarity.cosine functions or db.index.vector.queryNodes.\n"
+            "Note: If you use apoc.ml.openai.embedding, it must be the first operation in your query.\n"
+            "Result Chunking: When returning text, always provide exactly three chunks—no more, no less.\n"
+            "By following these guidelines, you'll ensure the generated Cypher queries accurately reflect the database entities and relationships."
         )
         return SystemMessage(content=system_message)
 
