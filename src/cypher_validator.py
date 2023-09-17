@@ -151,6 +151,9 @@ class CypherValidator:
                     label = getattr(parsed_pattern, label_attr, None)
                     if label is not None:
                         setattr(parsed_pattern, label_attr, label.replace("`", ""))
+                        # If the relationship label has * at the end, or **, etc, keep only the part before the first *
+                        if label_attr == 'relationship_label':
+                            setattr(parsed_pattern, label_attr, label.split('*')[0])
 
                 # Append the new ParsedQuery instance to the results
                 self._parsed_patterns.append(parsed_pattern)
