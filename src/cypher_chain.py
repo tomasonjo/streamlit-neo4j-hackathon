@@ -190,6 +190,7 @@ class CustomCypherChain(GraphCypherQAChain):
             "Note: If you use apoc.ml.openai.embedding, it must be the first operation in your query.\n"
             "Result Chunking: When returning text, always provide exactly three chunks—no more, no less.\n"
             "By following these guidelines, you'll ensure the generated Cypher queries accurately reflect the database entities and relationships."
+            "Solve it step by step."
         )
         return SystemMessage(content=system_message)
 
