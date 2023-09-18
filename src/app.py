@@ -13,7 +13,7 @@ st.title("VC Chatbot")
 
 from cypher_chain import CustomCypherChain
 
-url = st.secrets["NEO4J_URL"]
+url = st.secrets["NEO4J_URI"]
 username = st.secrets["NEO4J_USERNAME"]
 password = st.secrets["NEO4J_PASSWORD"]
 database = st.secrets["NEO4J_DATABASE"]
