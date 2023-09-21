@@ -239,7 +239,7 @@ class CustomCypherChain(GraphCypherQAChain):
         )
         print(generated_cypher.content)
         generated_cypher = extract_cypher(generated_cypher.content)
-        validated_cypher = generated_cypher
+        validated_cypher = [generated_cypher]
         #validated_cypher = validator.validate_query(
         #    AVAILABLE_RELATIONSHIPS, generated_cypher
         #)
