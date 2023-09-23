@@ -4,8 +4,7 @@ import re
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Tuple
-
+from typing import Any, Dict, List, Set, Tuple
 
 class PatternStatus(Enum):
     UNVALIDATED = 0
@@ -14,7 +13,6 @@ class PatternStatus(Enum):
     SOURCE_EQUALS_TARGET = 3
     DOES_NOT_EXIST = 4
     DO_NOT_CORRECT = 5
-
 
 @dataclass
 class ParsedPattern:
@@ -31,7 +29,6 @@ class ParsedPattern:
     raw: str  # parsed pattern as it appears in the query
     query: str
     status: PatternStatus
-
 
 class CypherValidator:
     """
@@ -52,26 +49,20 @@ class CypherValidator:
     _parsed_schemas (List[Tuple[str, str, str]]): A list of parsed schemas.
     _variable_label_mapping (List[Tuple[str, str]]): A list of variable label mappings.
     """
+    
+    _schema_pattern = r'\(([^,]+),\s*([^,]+),\s*([^)]+)\)'
+    _node_pattern = r'\(([\w]+)?:?([\w`:]+)?\s?(\{.*?\})?\)'
+    _relationship_pattern = r'\[?([\w]+)?:?([\w`*|!.]+)?\s*?(\{.*?\})?\]?'
 
-    _schema_pattern = r"\(([^,]+),\s*([^,]+),\s*([^)]+)\)"
-    _node_pattern = r"\(([\w]+)?:?([\w`:]+)?\s?(\{.*?\})?\)"
-    _relationship_pattern = r"\[?([\w]+)?:?([\w`*|!.]+)?\s*?(\{.*?\})?\]?"
-
-    _forward_relationship_pattern = r"-" + _relationship_pattern + r"->"
-    _backward_relationship_pattern = r"<-" + _relationship_pattern + r"-"
-    _undirected_relationship_pattern = r"-" + _relationship_pattern + r"-"
+    _forward_relationship_pattern = r'-' + _relationship_pattern + r'->'
+    _backward_relationship_pattern = r'<-' + _relationship_pattern + r'-'
+    _undirected_relationship_pattern = r'-' + _relationship_pattern + r'-'
 
     _forward_pattern = _node_pattern + _forward_relationship_pattern + _node_pattern
     _backward_pattern = _node_pattern + _backward_relationship_pattern + _node_pattern
-    _undirected_pattern = (
-        _node_pattern + _undirected_relationship_pattern + _node_pattern
-    )
+    _undirected_pattern = _node_pattern + _undirected_relationship_pattern + _node_pattern
 
-    _patterns = [
-        (_forward_pattern, "->"),
-        (_backward_pattern, "<-"),
-        (_undirected_pattern, "--"),
-    ]
+    _patterns = [(_forward_pattern, '->'), (_backward_pattern, '<-'), (_undirected_pattern, '--')]
 
     def __init__(self):
         """
@@ -80,7 +71,7 @@ class CypherValidator:
         self._parsed_patterns = []
         self._parsed_schemas = []
         self._variable_label_mapping = []
-
+    
     def _parse_schema(self, schema: str) -> None:
         """
         Parses the input schema string to identify individual schema elements and store them as tuples.
@@ -102,8 +93,7 @@ class CypherValidator:
         of the schema.
         """
         self._parsed_schemas = re.findall(self._schema_pattern, schema)
-        print(f"Parsed schema: {self._parsed_schemas}")
-
+    
     def _parse_pattern(self, query: str) -> None:
         """
         Parses the input query to identify specific patterns and directions.
@@ -134,33 +124,26 @@ class CypherValidator:
 
             while match:
                 # Unpack the matched groups and create a new ParsedQuery instance
-                parsed_pattern = ParsedPattern(
-                    *match.groups(),
-                    direction,
-                    match.group(),
-                    query,
-                    PatternStatus.UNVALIDATED,
-                )
+                parsed_pattern = ParsedPattern(*match.groups(), direction, match.group(), query, PatternStatus.UNVALIDATED)
 
                 # If there are backticks in the node and relationship labels, remove them
-                for label_attr in [
-                    "source_node_label",
-                    "relationship_label",
-                    "target_node_label",
-                ]:
+                for label_attr in ['source_node_label', 'relationship_label', 'target_node_label']:
                     label = getattr(parsed_pattern, label_attr, None)
                     if label is not None:
-                        setattr(parsed_pattern, label_attr, label.replace("`", ""))
+                        label = label.replace('`', '')
+                        setattr(parsed_pattern, label_attr, label)
+                        # *dcrouthamel - 09/2023 - Fix bug found by Tomaz.
                         # If the relationship label has * at the end, or **, etc, keep only the part before the first *
                         if label_attr == 'relationship_label':
-                            setattr(parsed_pattern, label_attr, label.split('*')[0])
+                            label = label.split('*')[0]
+                            setattr(parsed_pattern, label_attr, label)
 
                 # Append the new ParsedQuery instance to the results
                 self._parsed_patterns.append(parsed_pattern)
 
                 # Adjust the start position for the next search to be the beginning of the last matched group
                 start_pos = match.start(2)
-                tmp_query = tmp_query[start_pos - 1 :]  # -1 to include the parenthesis
+                tmp_query = tmp_query[start_pos-1:] # -1 to include the parenthesis
 
                 match = re.search(pattern, tmp_query)
 
@@ -185,12 +168,12 @@ class CypherValidator:
         -------------
         Modifies the internal `_variable_label_mapping` list, appending tuples in the format (variable, label).
         """
-        pattern = r"\((\w+):([\w:]+)\)"
+        pattern = r'\((\w+):([\w:]+)\)'
         match = re.findall(pattern, query)
 
         for var, label in match:
-            if ":" in label:
-                labels = label.split(":")
+            if ':' in label:
+                labels = label.split(':')
                 for lbl in labels:
                     self._variable_label_mapping.append((var, lbl))
             else:
@@ -221,42 +204,28 @@ class CypherValidator:
         for parsed_pattern in self._parsed_patterns:
 
             # If the relationship is between two nodes of the same labels, there is nothing to validate or correct
-            if (
-                parsed_pattern.source_node_label
-                and parsed_pattern.target_node_label
-                and parsed_pattern.source_node_label == parsed_pattern.target_node_label
-            ):
+            if parsed_pattern.source_node_label and parsed_pattern.target_node_label and parsed_pattern.source_node_label == parsed_pattern.target_node_label:
                 parsed_pattern.status = PatternStatus.SOURCE_EQUALS_TARGET
                 continue
 
             # If the input query has an undirected relationship in the pattern, we do not correct it.
-            if parsed_pattern.direction == "--":
+            if parsed_pattern.direction == '--':
                 parsed_pattern.status = PatternStatus.DO_NOT_CORRECT
                 continue
 
             for parsed_schema in self._parsed_schemas:
-                if not self._validate_relationship_labels(
-                    parsed_pattern, parsed_schema[1]
-                ):
+                if not self._validate_relationship_labels(parsed_pattern, parsed_schema[1]):
                     continue
 
                 direction_mapping = {
-                    "->": [
-                        (parsed_schema[0], parsed_schema[2], PatternStatus.EXISTS),
-                        (parsed_schema[2], parsed_schema[0], PatternStatus.REVERSE),
-                    ],
-                    "<-": [
-                        (parsed_schema[2], parsed_schema[0], PatternStatus.EXISTS),
-                        (parsed_schema[0], parsed_schema[2], PatternStatus.REVERSE),
-                    ],
+                    '->': [(parsed_schema[0], parsed_schema[2], PatternStatus.EXISTS),
+                        (parsed_schema[2], parsed_schema[0], PatternStatus.REVERSE)],
+                    '<-': [(parsed_schema[2], parsed_schema[0], PatternStatus.EXISTS),
+                        (parsed_schema[0], parsed_schema[2], PatternStatus.REVERSE)]
                 }
 
-                for source_label, target_label, status in direction_mapping[
-                    parsed_pattern.direction
-                ]:
-                    if self._validate_node_labels(
-                        parsed_pattern, source_label, target_label
-                    ):
+                for source_label, target_label, status in direction_mapping[parsed_pattern.direction]:
+                    if self._validate_node_labels(parsed_pattern, source_label, target_label):
                         parsed_pattern.status = status
                         break
 
@@ -266,9 +235,7 @@ class CypherValidator:
             if parsed_pattern.status == PatternStatus.UNVALIDATED:
                 parsed_pattern.status = PatternStatus.DOES_NOT_EXIST
 
-    def _validate_relationship_labels(
-        self, parsed_pattern: ParsedPattern, rel_schema: str
-    ) -> bool:
+    def _validate_relationship_labels(self, parsed_pattern: ParsedPattern, rel_schema: str) -> bool:
         """
         Validates relationship labels in a parsed pattern against a given relationship schema.
         
@@ -294,25 +261,19 @@ class CypherValidator:
         """
         if parsed_pattern.relationship_label is None:
             return True
-
+        
         # We may have multiple relationship labels in the pattern, so we need to split them
-        parsed_pattern_relationship_labels = (
-            parsed_pattern.relationship_label.split("|")
-            if parsed_pattern.relationship_label is not None
-            else [None]
-        )
+        parsed_pattern_relationship_labels = parsed_pattern.relationship_label.split('|') if parsed_pattern.relationship_label is not None else [None]
 
         for label in parsed_pattern_relationship_labels:
             if label == rel_schema:
                 return True
-            elif label.startswith("!") and label[1:] != rel_schema:
+            elif label.startswith('!') and label[1:] != rel_schema:
                 return True
-
+            
         return False
-
-    def _validate_node_labels(
-        self, parsed_pattern: ParsedPattern, source_schema: str, target_schema: str
-    ) -> bool:
+    
+    def _validate_node_labels(self, parsed_pattern: ParsedPattern, source_schema: str, target_schema: str) -> bool:
         """
         Validates the labels of source and target nodes in a given pattern based on a schema.
         
@@ -343,7 +304,6 @@ class CypherValidator:
         - The method uses a helper function `get_labels` to obtain the labels for source and target nodes.
         - Validation checks are done based on the obtained labels and the schema labels passed as arguments.
         """
-
         def get_labels(node_label, node_variable):
             labels = []
             if node_label is None:
@@ -351,15 +311,11 @@ class CypherValidator:
                     if node_variable == variable:
                         labels.append(label)
             else:
-                labels = node_label.split(":")
+                labels = node_label.split(':')
             return labels
 
-        source_labels = get_labels(
-            parsed_pattern.source_node_label, parsed_pattern.source_node_variable
-        )
-        target_labels = get_labels(
-            parsed_pattern.target_node_label, parsed_pattern.target_node_variable
-        )
+        source_labels = get_labels(parsed_pattern.source_node_label, parsed_pattern.source_node_variable)
+        target_labels = get_labels(parsed_pattern.target_node_label, parsed_pattern.target_node_variable)
 
         if not source_labels and not target_labels:
             return True
@@ -396,55 +352,34 @@ class CypherValidator:
         - The pattern's status must be one of the PatternStatus Enum values: UNVALIDATED, EXISTS, REVERSE, SOURCE_EQUALS_TARGET,
         DOES_NOT_EXIST, DO_NOT_CORRECT.
         """
-
+        
         updated_query = query
 
         for parsed_pattern in self._parsed_patterns:
             if parsed_pattern.status == PatternStatus.DOES_NOT_EXIST:
-                return ""
+                return ''
 
-            if parsed_pattern.status in [
-                PatternStatus.SOURCE_EQUALS_TARGET,
-                PatternStatus.DO_NOT_CORRECT,
-            ]:
+            if parsed_pattern.status in [PatternStatus.SOURCE_EQUALS_TARGET, PatternStatus.DO_NOT_CORRECT]:
                 continue
 
             if parsed_pattern.status == PatternStatus.REVERSE:
-                if parsed_pattern.direction == "<-":
-                    if "<--" in parsed_pattern.raw:
-                        substring = parsed_pattern.raw.replace("<--", "-->")
+                if parsed_pattern.direction == '<-':
+                    if '<--' in parsed_pattern.raw:
+                        substring = parsed_pattern.raw.replace('<--', '-->')
                     else:
-                        match = re.search(
-                            r"\)(<-)\[(?:[^]]*)\](-)\(", parsed_pattern.raw
-                        )
-                        substring = (
-                            parsed_pattern.raw[: match.start(1)]
-                            + "-"
-                            + parsed_pattern.raw[match.end(1) : match.start(2)]
-                            + "->"
-                            + parsed_pattern.raw[match.end(2) :]
-                        )
-                elif parsed_pattern.direction == "->":
-                    if "-->" in parsed_pattern.raw:
-                        substring = parsed_pattern.raw.replace("-->", "<--")
+                        match = re.search(r'\)(<-)\[(?:[^]]*)\](-)\(', parsed_pattern.raw)
+                        substring = parsed_pattern.raw[:match.start(1)] + '-' + parsed_pattern.raw[match.end(1):match.start(2)] + '->' + parsed_pattern.raw[match.end(2):]
+                elif parsed_pattern.direction == '->':
+                    if '-->' in parsed_pattern.raw:
+                        substring = parsed_pattern.raw.replace('-->', '<--')
                     else:
-                        match = re.search(
-                            r"\)(-)\[(?:[^]]*)\](->)\(", parsed_pattern.raw
-                        )
-                        substring = (
-                            parsed_pattern.raw[: match.start(1)]
-                            + "<-"
-                            + parsed_pattern.raw[match.end(1) : match.start(2)]
-                            + "-"
-                            + parsed_pattern.raw[match.end(2) :]
-                        )
+                        match = re.search(r'\)(-)\[(?:[^]]*)\](->)\(', parsed_pattern.raw)
+                        substring = parsed_pattern.raw[:match.start(1)] + '<-' + parsed_pattern.raw[match.end(1):match.start(2)] + '-' + parsed_pattern.raw[match.end(2):]
                 updated_query = updated_query.replace(parsed_pattern.raw, substring)
 
         return updated_query
 
-    def validate_query(
-        self, schema: str, query: str
-    ) -> Tuple[str, List[ParsedPattern]]:
+    def validate_query(self, schema: str, query: str) -> Tuple[str, List[ParsedPattern]]:
         """
         Validates and optionally updates a query based on a provided schema.
         
