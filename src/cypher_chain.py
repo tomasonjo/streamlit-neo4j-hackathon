@@ -14,7 +14,7 @@ try:
 except ImportError:
     from pydantic.main import BaseModel, Field
 
-from cypher_validator import CypherValidator
+from cypher_validator import CypherQueryCorrector, Schema
 
 
 def remove_entities(doc):
@@ -52,29 +52,29 @@ def remove_entities(doc):
     return new_text
 
 
-AVAILABLE_RELATIONSHIPS = """
-    (Person, HAS_PARENT, Person),
-    (Person, HAS_CHILD, Person),
-    (Organization, HAS_SUPPLIER, Organization),
-    (Organization, IN_CITY, City),
-    (Organization, HAS_CATEGORY, IndustryCategory),
-    (Organization, HAS_CEO, Person),
-    (Organization, HAS_SUBSIDIARY, Organization),
-    (Organization, HAS_COMPETITOR, Organization),
-    (Organization, HAS_BOARD_MEMBER, Person),
-    (Organization, HAS_INVESTOR, Organization),
-    (Organization, HAS_INVESTOR, Person),
-    (City, IN_COUNTRY, Country),
-    (Article, HAS_CHUNK, Chunk),
-    (Article, MENTIONS, Organization)
-"""
+AVAILABLE_RELATIONSHIPS = [
+    Schema("Person", "HAS_PARENT", "Person"),
+    Schema("Person", "HAS_CHILD", "Person"),
+    Schema("Organization", "HAS_SUPPLIER", "Organization"),
+    Schema("Organization", "IN_CITY", "City"),
+    Schema("Organization", "HAS_CATEGORY", "IndustryCategory"),
+    Schema("Organization", "HAS_CEO", "Person"),
+    Schema("Organization", "HAS_SUBSIDIARY", "Organization"),
+    Schema("Organization", "HAS_COMPETITOR", "Organization"),
+    Schema("Organization", "HAS_BOARD_MEMBER", "Person"),
+    Schema("Organization", "HAS_INVESTOR", "Organization"),
+    Schema("Organization", "HAS_INVESTOR", "Person"),
+    Schema("City", "IN_COUNTRY", "Country"),
+    Schema("Article", "HAS_CHUNK", "Chunk"),
+    Schema("Article", "MENTIONS", "Organization")
+]
 
 CYPHER_SYSTEM_TEMPLATE = """
 Purpose:
 Your role is to convert user questions concerning data in a Neo4j database into accurate Cypher queries.
 """
 
-validator = CypherValidator()
+cypher_query_corrector = CypherQueryCorrector(AVAILABLE_RELATIONSHIPS)
 
 CYPHER_QA_TEMPLATE = """You are an assistant that helps to form nice and human understandable answers.
 The information part contains the provided information that you must use to construct an answer.
@@ -221,7 +221,6 @@ class CustomCypherChain(GraphCypherQAChain):
         callbacks = _run_manager.get_child()
         question = inputs[self.input_key]
         chat_history = inputs["chat_history"]
-        intermediate_steps: List = []
         # Extract mentioned people and organizations and match them to database values
         entities = self.process_entities(question)
         print(f"NER found: {entities}")
@@ -239,15 +238,15 @@ class CustomCypherChain(GraphCypherQAChain):
         )
         print(generated_cypher.content)
         generated_cypher = extract_cypher(generated_cypher.content)
-        validated_cypher = validator.validate_query(
-            AVAILABLE_RELATIONSHIPS, generated_cypher
+        validated_cypher = cypher_query_corrector(
+            generated_cypher
         )
-        #print(validated_cypher)
+        print(validated_cypher)
         # If Cypher statement wasn't generated
         # Usually happens when LLM decides it can't answer
-        if not "RETURN" in validated_cypher[0]:
+        if not "RETURN" in validated_cypher:
             chain_result: Dict[str, Any] = {
-                self.output_key: validated_cypher[0],
+                self.output_key: validated_cypher,
                 "viz_data": (None, None),
                 "database": None,
                 "cypher": None,
@@ -256,7 +255,7 @@ class CustomCypherChain(GraphCypherQAChain):
 
         # Retrieve and limit the number of results
         context = self.graph.query(
-            validated_cypher[0], {"openai_api_key": os.environ["OPENAI_API_KEY"]}
+            validated_cypher, {"openai_api_key": os.environ["OPENAI_API_KEY"]}
         )[: self.top_k]
 
         result = self.qa_chain(
