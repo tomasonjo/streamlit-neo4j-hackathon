@@ -273,6 +273,6 @@ class CustomCypherChain(GraphCypherQAChain):
             self.output_key: final_result,
             "viz_data": (viz_data, final_entities),
             "database": context,
-            "cypher": validated_cypher[0],
+            "cypher": validated_cypher,
         }
         return chain_result
