@@ -164,7 +164,7 @@ class CustomCypherChain(GraphCypherQAChain):
     ) -> SystemMessage:
         system_message = CYPHER_SYSTEM_TEMPLATE
         system_message += (
-            f"Database Schema: Please refer to the provided database schema {self.graph.get_schema} for reference. "
+            f"Database Schema: Please refer to the provided database schema {self.graph_schema} for reference. "
             "Guidelines: Relationships & Properties: Utilize only the relationship types "
             "and properties specified in the provided schema. Do not introduce new ones.\n"
         )
